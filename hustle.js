@@ -737,8 +737,6 @@
             check_db();
             options || (options = {});
 
-            if (qoptions.tubes.indexOf(tbl.reserved) < 0) throw new HustleBadTube('tube _reserved doesn\'t exist');
-
             var count = null;
 
             var trx = db.transaction(tbl.reserved, 'readonly');
@@ -747,7 +745,7 @@
             };
             trx.onerror = function(e) {
                 if (options.error) options.error(e);
-            }
+            };
 
             var store = trx.objectStore(tbl.reserved);
             var req = store.count();
@@ -993,7 +991,7 @@
             this.Queue.kick_job = do_promisify(this.Queue.kick_job, 1);
             this.Queue.touch = do_promisify(this.Queue.touch, 1);
             this.Queue.count_ready = do_promisify(this.Queue.count_ready, 1);
-            this.Queue.count_reserved = do_promisify(this.Queue.count_reserved, 1);
+            this.Queue.count_reserved = do_promisify(this.Queue.count_reserved, 0);
             return this;
         }.bind(this);
         this.debug = {
