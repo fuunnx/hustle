@@ -958,7 +958,13 @@
             };
 
             var trx = db.transaction(tbl.reserved, 'readonly');
-            trx.oncomplete = move_items_to_buried;
+            trx.oncomplete = function() {
+                if (abandoned_items.length == 0) {
+                    if (options.success) options.success();
+                } else {
+                    move_items_to_buried();
+                }
+            };
             trx.onerror = function(e) {
                 if (options.error) options.error(e);
             };

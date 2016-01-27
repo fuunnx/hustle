@@ -878,4 +878,26 @@ describe('Hustle cleanup abandoned items', function() {
 
 		add_items_to_queue();
 	});
+
+	it('still succeeds if there are no abandoned items', function(done) {
+		var fail_spec = function(e) {
+			expect(function(){ throw e }).not.toThrow();
+			done();
+		};
+
+		var assert_cleanup_was_successful = function() {
+			hustle.Queue.count_reserved({
+				success: function(count) {
+					expect(count).toBe(0);
+					done();
+				},
+				error: fail_spec
+			});
+		};
+
+		hustle.Queue.cleanup_abandoned_items({
+			success: assert_cleanup_was_successful,
+			error: fail_spec
+		});
+	});
 });
