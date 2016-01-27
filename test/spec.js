@@ -812,3 +812,70 @@ describe('Stress tests', function() {
 	});
 });
 
+describe('Hustle cleanup abandoned items', function() {
+	var hustle = new Hustle({
+		tubes: ['jobs']
+	});
+
+	beforeEach(function(done) {
+		hustle.wipe();
+		hustle.open({
+			success: done,
+			error: done
+		});
+	});
+
+	afterEach(function() {
+		hustle.close();
+	});
+
+	it('buries any items in the reserved queue', function(done) {
+		var reserved_items = [];
+		var number_of_items = 3;
+
+		var fail_spec = function(e) {
+			expect(function(){ throw e }).not.toThrow();
+			done();
+		};
+
+		var add_items_to_queue = function() {
+			for(var i = 0; i < number_of_items; i++) {
+				hustle.Queue.put('Test Item', {
+					success: reserve_item,
+					error: fail_spec
+				});
+			};
+		};
+
+		var reserve_item = function() {
+			hustle.Queue.reserve({
+				success: function(item) {
+					reserved_items.push(item);
+					call_cleanup_abandoned_items();
+				},
+				error: fail_spec
+			});
+		};
+
+		var call_cleanup_abandoned_items = function() {
+			if(reserved_items.length == number_of_items) {
+				hustle.Queue.cleanup_abandoned_items({
+					success: assert_cleanup_was_successful,
+					error: fail_spec
+				});
+			}
+		}
+
+		var assert_cleanup_was_successful = function() {
+			hustle.Queue.count_reserved({
+				success: function(count) {
+					expect(count).toBe(0);
+					done();
+				},
+				error: fail_spec
+			});
+		};
+
+		add_items_to_queue();
+	});
+});

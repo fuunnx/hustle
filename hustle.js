@@ -928,6 +928,52 @@
         };
 
         /**
+         * bury any items in the reserved queue
+         */
+        var cleanup_abandoned_items = function(options) {
+            options || (options = {});
+            var abandoned_items = [];
+            var number_of_buried_items = 0;
+
+            var move_items_to_buried = function() {
+                abandoned_items.forEach(function(item) {
+                    move_item(item.id, tbl.reserved, tbl.buried, {
+                        transform: function(transform_item) {
+                            transform_item.abandoned = true;
+                            return transform_item;
+                        },
+                        success: exit_after_processing_all_items,
+                        error: function(e) {
+                            if (options.error) options.error(e);
+                        }
+                    });
+                });
+            };
+
+            var exit_after_processing_all_items = function() {
+                number_of_buried_items++;
+                if(number_of_buried_items == abandoned_items.length) {
+                    if (options.success) options.success();
+                }
+            };
+
+            var trx = db.transaction(tbl.reserved, 'readonly');
+            trx.oncomplete = move_items_to_buried;
+            trx.onerror = function(e) {
+                if (options.error) options.error(e);
+            };
+
+            var store = trx.objectStore(tbl.reserved);
+            store.openCursor().onsuccess = function(e) {
+                var cursor = e.target.result;
+                if (cursor) {
+                    abandoned_items.push(cursor.value);
+                    cursor.continue();
+                }
+            }
+        };
+
+        /**
          * this function does database cleanup. only runs while db is open.
          */
         do_maintenance = function() {
@@ -957,6 +1003,7 @@
             touch: touch,
             count_ready: count_ready,
             count_reserved: count_reserved,
+            cleanup_abandoned_items: cleanup_abandoned_items,
             Consumer: Consumer
         };
         this.open = open;
@@ -992,6 +1039,7 @@
             this.Queue.touch = do_promisify(this.Queue.touch, 1);
             this.Queue.count_ready = do_promisify(this.Queue.count_ready, 1);
             this.Queue.count_reserved = do_promisify(this.Queue.count_reserved, 0);
+            this.Queue.cleanup_abandoned_items = do_promisify(this.Queue.cleanup_abandoned_items, 0);
             return this;
         }.bind(this);
         this.debug = {
