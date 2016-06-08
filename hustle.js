@@ -458,18 +458,17 @@
                 });
             };
 
-            if (comparator) {
-                getAllItems(tube, {
-                    success: function (items) {
-                        var status = items.some(function (existingItem) {
-                            return comparator(item.data, existingItem.data);
-                        });
-
-                        if (!status) {
-                            createItem();
-                        }
-                    }
+            var addUniqueItemToQueue = function (items) {
+                var itemAlreadyExists = items.some(function (existingItem) {
+                    return comparator(item.data, existingItem.data);
                 });
+                if (!itemAlreadyExists) {
+                    createItem();
+                }
+            };
+
+            if (comparator) {
+                getAllItems(tube, {success: addUniqueItemToQueue});
             }
             else {
                 createItem();

@@ -123,6 +123,11 @@ describe('Hustle queue operations', function() {
 			done();
 		};
 
+		var addDuplicateItem = function (item) {
+			success(item);
+			hustle.Queue.put('Job1', {tube: 'outgoing', success: success, comparator:comparator});
+		};
+
 		var success	=	function(item)
 		{
 			items.push(item.data);
@@ -133,8 +138,7 @@ describe('Hustle queue operations', function() {
 			return item1 === item2;
 		};
 
-		hustle.Queue.put('Job1', {tube: 'outgoing', success: success, comparator:comparator});
-		hustle.Queue.put('Job1', {tube: 'outgoing', comparator:comparator});
+		hustle.Queue.put('Job1', {tube: 'outgoing', success: addDuplicateItem, comparator:comparator});
 		hustle.Queue.put('Job2', {tube: 'outgoing', success: success, comparator:comparator});
 	});
 
@@ -169,7 +173,7 @@ describe('Hustle queue operations', function() {
 		{
 			expect(error).toBe(false);
 			// 10 - 1 reserved item
-			expect(count).toBe(12);
+			expect(count).toBe(11);
 			done();
 		};
 		hustle.Queue.count_ready('outgoing', {
