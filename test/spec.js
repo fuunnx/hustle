@@ -108,6 +108,36 @@ describe('Hustle queue operations', function() {
 		}
 	});
 
+	it('should not add duplicate queue items', function(done) {
+		var errors			=	[];
+		var items			=	[];
+		var num_messages	=	2;
+		var num_finished	=	0;
+
+		var finish = function()
+		{
+			num_finished++;
+			if(num_finished < num_messages) return;
+			expect(items[0]).toBe('Job1');
+			expect(items[1]).toBe('Job2');
+			done();
+		};
+
+		var success	=	function(item)
+		{
+			items.push(item.data);
+			finish();
+		};
+
+		var comparator = function (item1, item2) {
+			return item1 === item2;
+		};
+
+		hustle.Queue.put('Job1', {tube: 'outgoing', success: success, comparator:comparator});
+		hustle.Queue.put('Job1', {tube: 'outgoing', comparator:comparator});
+		hustle.Queue.put('Job2', {tube: 'outgoing', success: success, comparator:comparator});
+	});
+
 	it('can reserve an item', function(done) {
 		var id		=	null;
 		var error	=	false;
@@ -139,7 +169,7 @@ describe('Hustle queue operations', function() {
 		{
 			expect(error).toBe(false);
 			// 10 - 1 reserved item
-			expect(count).toBe(9);
+			expect(count).toBe(12);
 			done();
 		};
 		hustle.Queue.count_ready('outgoing', {

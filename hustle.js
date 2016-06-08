@@ -404,6 +404,14 @@
          * tube)
          */
         var put = function(data, options) {
+            var getAllItems = function (tube, options) {
+                var tr = db.transaction([tube], 'readonly');
+                var store = tr.objectStore(tube);
+                store.getAll().onsuccess = function (e) {
+                    if (options.success) options.success(e.target.result);
+                };
+            };
+
             check_db();
             options || (options = {});
             if (!data) return false;
@@ -419,29 +427,53 @@
                 delete item.delayed;
             }
 
-            // grab a unique ID for this item
-            new_id({
-                success: function(id) {
-                    item.id = id;
+            var comparator = options.comparator;
 
-                    var trx = db.transaction([tube], 'readwrite');
-                    trx.oncomplete = function(e) {
-                        if (options.success) options.success(item, e);
-                    };
-                    trx.onerror = function(e) {
-                        if (options.error) options.error(e);
+            var createItem = function () {
+                // grab a unique ID for this item
+                new_id({
+                    success: function(id) {
+                        item.id = id;
+
+                        var trx = db.transaction([tube], 'readwrite');
+                        trx.oncomplete = function(e) {
+                            if (options.success) options.success(item, e);
+                        };
+                        trx.onerror = function(e) {
+                            if (options.error) options.error(e);
+                        };
+
+                        var store = trx.objectStore(tube);
+                        store.openCursor().onsuccess = function (e) {
+
+                        };
+                        var req = store.add(item);
+                        req.onsuccess = function(e) {
+                            item.id = e.target.result;
+                        };
+                    },
+                    error: function(e) {
+                        if (options.error) options.error(new HustleBadID('error generating id'));
                     }
+                });
+            };
 
-                    var store = trx.objectStore(tube);
-                    var req = store.add(item);
-                    req.onsuccess = function(e) {
-                        item.id = e.target.result;
-                    };
-                },
-                error: function(e) {
-                    if (options.error) options.error(new HustleBadID('error generating id'));
-                }
-            });
+            if (comparator) {
+                getAllItems(tube, {
+                    success: function (items) {
+                        var status = items.some(function (existingItem) {
+                            return comparator(item.data, existingItem.data);
+                        });
+
+                        if (!status) {
+                            createItem();
+                        }
+                    }
+                });
+            }
+            else {
+                createItem();
+            }
 
         };
 
