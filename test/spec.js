@@ -111,15 +111,25 @@ describe('Hustle queue operations', function() {
 	it('should not add duplicate queue items', function(done) {
 		var errors			=	[];
 		var items			=	[];
-		var num_messages	=	2;
+		var num_messages	=	3;
 		var num_finished	=	0;
+
+		var getUniqueItems = function (items) {
+			return items.filter(function (value, index, array) {
+				return array.indexOf(value) === index;
+			});
+		};
 
 		var finish = function()
 		{
 			num_finished++;
 			if(num_finished < num_messages) return;
-			expect(items[0]).toBe('Job1');
-			expect(items[1]).toBe('Job2');
+
+			var uniqueItems = getUniqueItems(items);
+			expect(items.length).toEqual(3);
+			expect(uniqueItems.length).toEqual(2);
+			expect(uniqueItems).toContain('Job1');
+			expect(uniqueItems).toContain('Job2');
 			done();
 		};
 

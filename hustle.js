@@ -459,20 +459,13 @@
             };
 
             var addUniqueItemToQueue = function (items) {
-                var itemAlreadyExists = items.some(function (existingItem) {
-                    return comparator(item.data, existingItem.data);
+                var existingItem = items.find(function (currentItem) {
+                    return comparator(item.data, currentItem.data);
                 });
-                if (!itemAlreadyExists) {
-                    createItem();
-                }
+                existingItem ? options.success(existingItem) : createItem();
             };
 
-            if (comparator) {
-                getAllItems(tube, {success: addUniqueItemToQueue});
-            }
-            else {
-                createItem();
-            }
+            comparator ? getAllItems(tube, {success: addUniqueItemToQueue}) : createItem();
 
         };
 
