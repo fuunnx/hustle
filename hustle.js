@@ -407,9 +407,24 @@
             var getAllItems = function (tube, options) {
                 var tr = db.transaction([tube], 'readonly');
                 var store = tr.objectStore(tube);
-                store.getAll().onsuccess = function (e) {
-                    if (options.success) options.success(e.target.result);
-                };
+                if (store.getAll) {
+                    store.getAll().onsuccess = function (e) {
+                        if (options.success) options.success(e.target.result);
+                    };
+                }
+                else {
+                    var items = [];
+                    store.openCursor().onsuccess = function (e) {
+                        var cursor = e.target.result;
+                        if (cursor) {
+                            items.push(cursor.value);
+                            cursor.continue();
+                        }
+                        else {
+                            options.success(items);
+                        }
+                    }
+                }
             };
 
             check_db();
