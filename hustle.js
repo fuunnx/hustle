@@ -1018,9 +1018,17 @@
             }
         };
 
+        /**
+         * rescues any items in the reserved queue by moving it to its tube
+         * or moving it to buried queue if it exceeds a maximum rescue limit
+         */
         var rescue_reserved_items = function (options) {
             var items_in_reserved = [];
             var number_of_rescued_items = 0;
+            var DEFAULT_RESCUE_LIMIT = 5, DEFAULT_RESCUE_TIME_LIMIT_IN_SECONDS = 60;
+            var maxRescueLimit = options.maxRescueLimit || DEFAULT_RESCUE_LIMIT;
+            var rescueTimeLimitInSeconds = options.rescueTimeLimitInSeconds || DEFAULT_RESCUE_TIME_LIMIT_IN_SECONDS;
+
 
             var exit_after_processing_all_items = function () {
                 number_of_rescued_items++;
@@ -1033,12 +1041,15 @@
 
                 var move_item_to_tube = function (item) {
 
+                    /**
+                     * increase number of times it has been rescued based on timestamp it was rescued last
+                     */
                     var should_increase_abandon_count = function (item) {
                         if(!item.lastAbandonedTime) {
                             return true;
                         }
                         var timeInSecondsAfterLastAbandoned =  (new Date().getTime() - item.lastAbandonedTime)/1000;
-                        return timeInSecondsAfterLastAbandoned > options.rescueTimeLimitInSeconds;
+                        return timeInSecondsAfterLastAbandoned > rescueTimeLimitInSeconds;
                     };
 
                     move_item(item.id, tbl.reserved, item.tube, {
@@ -1067,7 +1078,7 @@
                 };
 
                 items_in_reserved.forEach(function (item) {
-                    var shouldRescue = !item.abandon_count || options.maxRescueLimit > item.abandon_count;
+                    var shouldRescue = !item.abandon_count || maxRescueLimit > item.abandon_count;
                     if(shouldRescue) {
                         move_item_to_tube(item);
                     } else {
