@@ -908,7 +908,7 @@ describe('Hustle cleanup abandoned items', function() {
 					error: fail_spec
 				});
 			}
-		}
+		};
 
 		var assert_cleanup_was_successful = function() {
 			hustle.Queue.count_reserved({
@@ -944,4 +944,187 @@ describe('Hustle cleanup abandoned items', function() {
 			error: fail_spec
 		});
 	});
+});
+
+describe('Hustle rescue abandoned items', function () {
+	var hustle = new Hustle({
+		tubes: ['jobs', '_buried']
+	});
+
+	var fail_spec = function(e) {
+		expect(function(){ throw e }).not.toThrow();
+		done();
+	};
+
+	beforeEach(function(done) {
+		hustle.wipe();
+		hustle.open({
+			success: done,
+			error: done
+		});
+	});
+
+	afterEach(function() {
+		hustle.close();
+	});
+
+	it('should put back any item from reserved queue into tube', function (done) {
+		var reserved_items = [];
+		var number_of_items = 3;
+
+		var add_items_to_queue = function () {
+			for(var i = 0; i < number_of_items; i++) {
+				hustle.Queue.put('Test Item', {
+					tube: 'jobs',
+					success: reserve_item,
+					error: fail_spec
+				});
+			}
+		};
+
+		var reserve_item = function () {
+			hustle.Queue.reserve({
+				tube: 'jobs',
+				success: function (item) {
+					reserved_items.push(item);
+					rescue_reserved_items();
+				},
+				error: fail_spec
+			});
+		};
+
+		var rescue_reserved_items = function() {
+			if(reserved_items.length == number_of_items) {
+				hustle.Queue.rescue_reserved_items({
+					success: assert_cleanup_was_successful,
+					error: fail_spec
+				});
+			}
+		};
+
+		var assert_cleanup_was_successful = function() {
+			hustle.Queue.count_reserved({
+				success: function(count) {
+					expect(count).toBe(0);
+				},
+				error: fail_spec
+			});
+			hustle.Queue.count_ready('jobs', {
+				success: function (count) {
+					expect(count).toBe(number_of_items);
+					done();
+				},
+				error: fail_spec
+			});
+		};
+
+		add_items_to_queue();
+	});
+
+	it('should bury an item if it exceeds max number of abandons', function (done) {
+		var reserved_item, number_of_times_moved_to_reserve = 2, count = 0;
+
+		var add_items_to_queue = function () {
+			hustle.Queue.put('Test Item', {
+				tube: 'jobs',
+				success: reserve_item,
+				error: fail_spec
+			});
+		};
+
+		var reserve_item = function () {
+			hustle.Queue.reserve({
+				tube: 'jobs',
+				success: function (item) {
+					reserved_item = item;
+					rescue_reserved_items();
+				},
+				error: fail_spec
+			});
+		};
+
+		var rescue_reserved_items = function () {
+			hustle.Queue.rescue_reserved_items({
+				success: assert_cleanup_was_successful,
+				error: fail_spec,
+				maxRescueLimit: 1
+			});
+		};
+
+		var assert_cleanup_was_successful = function () {
+			count++;
+			if (number_of_times_moved_to_reserve == count) {
+				hustle.Queue.count_ready('jobs', {
+					success: function (count) {
+						expect(count).toBe(0);
+					},
+					error: fail_spec
+				});
+				hustle.Queue.count_ready('_buried', {
+					success: function (count) {
+						expect(count).toBe(1);
+						done();
+					},
+					error: fail_spec
+				});
+			} else {
+				reserve_item();
+			}
+		};
+		add_items_to_queue()
+	});
+
+	it('should not increase the abandon count if it was last rescued with in the rescueTimeLimit', function (done) {
+		var reserved_item, number_of_times_moved_to_reserve = 4, count = 0;
+
+
+		var baseTime = new Date(2014,10,24,9,19,29);
+		jasmine.clock().install();
+		jasmine.clock().mockDate(baseTime);
+
+		var add_items_to_queue = function () {
+			hustle.Queue.put('Test Item', {
+				tube: 'jobs',
+				success: reserve_item,
+				error: fail_spec
+			});
+		};
+
+		var reserve_item = function () {
+			hustle.Queue.reserve({
+				tube: 'jobs',
+				success: function (item) {
+					reserved_item = item;
+					rescue_reserved_items();
+				},
+				error: fail_spec
+			});
+		};
+
+		var rescue_reserved_items = function () {
+			hustle.Queue.rescue_reserved_items({
+				success: assert_cleanup_was_successful,
+				error: fail_spec,
+				maxRescueLimit: 3,
+				rescueTimeLimitInSeconds: 2
+			});
+		};
+
+		var assert_cleanup_was_successful = function () {
+			count++;
+			if (number_of_times_moved_to_reserve == count) {
+				hustle.Queue.peek(reserved_item.id, {
+					success: function (item) {
+						expect(item.abandon_count).toBe(2);
+						done();
+					}
+				});
+			} else {
+				jasmine.clock().tick(1000);
+				reserve_item();
+			}
+		};
+		add_items_to_queue()
+	});
+
 });

@@ -367,7 +367,7 @@
             };
             trx.onerror = function(e) {
                 if (options.error) options.error(e);
-            }
+            };
 
             // scan all tables for this id
             tables.forEach(function(table) {
@@ -1018,6 +1018,86 @@
             }
         };
 
+        var rescue_reserved_items = function (options) {
+            var items_in_reserved = [];
+            var number_of_rescued_items = 0;
+
+            var exit_after_processing_all_items = function () {
+                number_of_rescued_items++;
+                if(number_of_rescued_items == items_in_reserved.length) {
+                    if(options.success) options.success();
+                }
+            };
+
+            var move_items_in_reserved = function () {
+
+                var move_item_to_tube = function (item) {
+
+                    var should_increase_abandon_count = function (item) {
+                        if(!item.lastAbandonedTime) {
+                            return true;
+                        }
+                        var timeInSecondsAfterLastAbandoned =  (new Date().getTime() - item.lastAbandonedTime)/1000;
+                        return timeInSecondsAfterLastAbandoned > options.rescueTimeLimitInSeconds;
+                    };
+
+                    move_item(item.id, tbl.reserved, item.tube, {
+                        transform: function (item) {
+                            if(should_increase_abandon_count(item)) {
+                                item.lastAbandonedTime = new Date();
+                                item.abandon_count = item.abandon_count || 0;
+                                item.abandon_count++;
+                            }
+                            return item;
+                        },
+                        success: exit_after_processing_all_items,
+                        error: function (e) {
+                            if (options.error) options.error(e);
+                        }
+                    });
+                };
+
+                var move_item_to_buried = function (item) {
+                    move_item(item.id, tbl.reserved, tbl.buried, {
+                        success: exit_after_processing_all_items,
+                        error: function (e) {
+                            if (options.error) options.error(e);
+                        }
+                    });
+                };
+
+                items_in_reserved.forEach(function (item) {
+                    var shouldRescue = !item.abandon_count || options.maxRescueLimit > item.abandon_count;
+                    if(shouldRescue) {
+                        move_item_to_tube(item);
+                    } else {
+                        move_item_to_buried(item);
+                    }
+                });
+            };
+
+            var trx = db.transaction(tbl.reserved, 'readonly');
+            trx.oncomplete = function () {
+                if (items_in_reserved.length == 0) {
+                    if(options.success) options.success();
+                } else {
+                    move_items_in_reserved();
+                }
+            };
+            trx.onerror = function(e) {
+                if (options.error) options.error(e);
+            };
+
+            var store = trx.objectStore(tbl.reserved);
+            store.openCursor().onsuccess = function (e) {
+                var cursor = e.target.result;
+                if(cursor) {
+                    items_in_reserved.push(cursor.value);
+                    cursor.continue();
+                }
+            };
+        };
+
         /**
          * this function does database cleanup. only runs while db is open.
          */
@@ -1049,6 +1129,7 @@
             count_ready: count_ready,
             count_reserved: count_reserved,
             cleanup_abandoned_items: cleanup_abandoned_items,
+            rescue_reserved_items: rescue_reserved_items,
             Consumer: Consumer
         };
         this.open = open;
@@ -1085,6 +1166,7 @@
             this.Queue.count_ready = do_promisify(this.Queue.count_ready, 1);
             this.Queue.count_reserved = do_promisify(this.Queue.count_reserved, 0);
             this.Queue.cleanup_abandoned_items = do_promisify(this.Queue.cleanup_abandoned_items, 0);
+            this.Queue.rescue_reserved_items = do_promisify(this.Queue.rescue_reserved_items, 0);
             return this;
         }.bind(this);
         this.debug = {
