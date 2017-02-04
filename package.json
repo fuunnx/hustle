@@ -1,0 +1,8 @@
+{
+  "name": "hustle",
+  "version": "0.2.0",
+  "description": "A persistent javascript queuing/messaging library",
+  "license": "Copyright (c) 2014 Lyon Bros. Enterprises, LLC",
+  "main": "hustle.js",
+  "author": ""
+}
