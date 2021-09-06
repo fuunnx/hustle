@@ -589,11 +589,12 @@
                     }
 
                     var tube = item.tube;
+                    var activate
 
                     if (options.delay) {
                         var delay = parseInt(options.delay);
                         if (delay) {
-                            item.activate = new Date().getTime() + (1000 * delay);
+                            activate = new Date().getTime() + (1000 * delay);
                             tube = tbl.delayed;
                         }
                     }
@@ -605,7 +606,9 @@
                                 var pri = parseInt(options.priority);
                                 if (pri) item.priority = pri;
                             }
-                            delete item.tube;
+                            if (activate) {
+                                item.activate = activate
+                            }
                             return item;
                         },
                         success: options.success,
