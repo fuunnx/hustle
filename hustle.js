@@ -848,9 +848,9 @@
                 // grab an item from the tube
                 reserve({
                     tube: tube,
-                    success: function(item) {
+                    success: async function(item) {
                         if (!item) return;
-                        fn(item);
+                        await fn(item);
                         // immediately poll for new items
                         setTimeout(function() {
                             poll({
